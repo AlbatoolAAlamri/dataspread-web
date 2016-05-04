@@ -16,24 +16,10 @@ Copyright (C) 2013 Potix Corporation. All Rights Reserved.
 */
 package org.zkoss.zss.model.impl;
 
-import java.sql.*;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.SortedMap;
-import java.util.function.Supplier;
-
 import org.zkoss.lang.Library;
 import org.zkoss.poi.ss.util.CellReference;
 import org.zkoss.poi.ss.util.SheetUtil;
 import org.zkoss.poi.ss.util.WorkbookUtil;
-import org.zkoss.poi.util.SystemOutLogger;
 import org.zkoss.util.logging.Log;
 import org.zkoss.zss.model.*;
 import org.zkoss.zss.model.SAutoFilter.FilterOp;
@@ -41,10 +27,14 @@ import org.zkoss.zss.model.SAutoFilter.NFilterColumn;
 import org.zkoss.zss.model.SPicture.Format;
 import org.zkoss.zss.model.sys.EngineFactory;
 import org.zkoss.zss.model.sys.dependency.DependencyTable;
-import org.zkoss.zss.model.sys.dependency.Ref;
 import org.zkoss.zss.model.sys.dependency.ObjectRef.ObjectType;
+import org.zkoss.zss.model.sys.dependency.Ref;
 import org.zkoss.zss.model.sys.formula.FormulaClearContext;
 import org.zkoss.zss.model.util.Validations;
+
+import java.sql.*;
+import java.util.*;
+import java.util.function.Supplier;
 /**
  * 
  * @author dennis
@@ -72,7 +62,11 @@ public class SheetImpl extends AbstractSheetAdv {
 	private String _spinCount;
 	private String _algName;
 	private String _saltValue;
-	
+
+	private int block_size = 100;
+	private BTree<Integer, Integer> btree;
+
+
 	private final IndexPool<AbstractRowAdv> _rows = new IndexPool<AbstractRowAdv>(){
 		private static final long serialVersionUID = 1L;
 		@Override
@@ -350,28 +344,31 @@ public class SheetImpl extends AbstractSheetAdv {
 		int maxRow = minRow+PreFetchSize*2-1;
 
 		String bookTable = getBook().getId();
-		String query ="SELECT * FROM "+ bookTable +"_sheetdata WHERE sheetid = ? AND row BETWEEN ? AND ?";
+		String query ="SELECT * FROM "+ bookTable +"_sheetdata WHERE sheetid = ? AND row = ?";
 		for (int i=minRow;i<=maxRow;i++)
 			getOrCreateRow(i);
 
-		try (Connection connection = DBHandler.instance.getConnection();
-			 PreparedStatement stmt = ((Supplier<PreparedStatement>)() -> {
-				 try {
-					 PreparedStatement s = connection.prepareStatement(query);
-					 s.setInt(1, getDBId());
-					 s.setInt(2, minRow);
-					 s.setInt(3, maxRow);
-					 return s;
-				 } catch (SQLException e) { throw new RuntimeException(e); }
-			 }).get();
-			 ResultSet rs = stmt.executeQuery()) {
-			while (rs.next())
-				getOrCreateCell(rs.getInt("row"), rs.getInt("col")).setValueParse(rs.getString("value"));
+		for (int i=minRow;i<=maxRow;i++){
+			long rowid = btree.getByCount(i);
+			try (Connection connection = DBHandler.instance.getConnection();
+				 PreparedStatement stmt = ((Supplier<PreparedStatement>)() -> {
+					 try {
+						 PreparedStatement s = connection.prepareStatement(query);
+						 s.setInt(1, getDBId());
+						 s.setLong(2, rowid);
+						 return s;
+					 } catch (SQLException e) { throw new RuntimeException(e); }
+				 }).get();
+				 ResultSet rs = stmt.executeQuery()) {
+				while (rs.next())
+					getOrCreateCell(rs.getInt("row"), rs.getInt("col")).setValueParse(rs.getString("value"));
+			}
+			catch (SQLException e)
+			{
+				e.printStackTrace();
+			}
 		}
-		catch (SQLException e)
-		{
-			e.printStackTrace();
-		}
+
 	}
 
 
@@ -565,23 +562,27 @@ public class SheetImpl extends AbstractSheetAdv {
 		//Delete from DB
 		String bookTable = getBook().getId();
 		String updateWorkbook = "DELETE FROM  " + bookTable + "_sheetdata WHERE sheetid = ? " +
-				" AND row BETWEEN  ? AND ? " +
+				" AND row = ? " +
 				" AND col BETWEEN  ? AND ? ";
 
-		try (Connection connection = DBHandler.instance.getConnection();
-			 PreparedStatement stmt = connection.prepareStatement(updateWorkbook)) {
-			stmt.setInt(1, getDBId());
-			stmt.setInt(2, rowStart);
-			stmt.setInt(3, rowEnd);
-			stmt.setInt(4, columnStart);
-			stmt.setInt(5, columnEnd);
-			stmt.execute();
-			connection.commit();
+		for (int i = rowEnd; i>=rowStart; i--){
+			long rowid = btree.getByCount(i);
+			btree.removeByCount(i);
+			try (Connection connection = DBHandler.instance.getConnection();
+				 PreparedStatement stmt = connection.prepareStatement(updateWorkbook)) {
+				stmt.setInt(1, getDBId());
+				stmt.setLong(2, rowid);
+				stmt.setInt(3, columnStart);
+				stmt.setInt(4, columnEnd);
+				stmt.execute();
+				connection.commit();
+			}
+			catch (SQLException e)
+			{
+				e.printStackTrace();
+			}
 		}
-		catch (SQLException e)
-		{
-			e.printStackTrace();
-		}
+
 
 
 	}
@@ -690,7 +691,7 @@ public class SheetImpl extends AbstractSheetAdv {
 		}
 		
 		//shift data validation will be done inside extendFormula
-		extendFormula(new CellRegion(rowIdx,0,lastRowIdx,_book.getMaxColumnIndex()), false);
+		extendFormula(new CellRegion(rowIdx, 0, lastRowIdx, _book.getMaxColumnIndex()), false);
 		
 		//shift freeze panel
 		int freezeIdx = _viewInfo.getNumOfRowFreeze()-1;
@@ -772,7 +773,7 @@ public class SheetImpl extends AbstractSheetAdv {
 
 		//TODO shift data validation?
 		
-		shrinkFormula(new CellRegion(rowIdx,0,lastRowIdx,_book.getMaxColumnIndex()), false);
+		shrinkFormula(new CellRegion(rowIdx, 0, lastRowIdx, _book.getMaxColumnIndex()), false);
 		
 		//shift freeze panel
 		int freezeIdx = _viewInfo.getNumOfRowFreeze()-1;
@@ -877,12 +878,12 @@ public class SheetImpl extends AbstractSheetAdv {
 			ModelUpdateUtil.addCellUpdate(this, rowIdx, columnIdx, getBook().getMaxRowIndex(), lastColumnIdx, CellAttribute.ALL); //ZSS-939
 		}
 		
-		shiftAfterCellInsert(rowIdx, columnIdx, lastRowIdx,lastColumnIdx,horizontal);
+		shiftAfterCellInsert(rowIdx, columnIdx, lastRowIdx, lastColumnIdx, horizontal);
 	}
 
 	@Override
 	public void deleteCell(CellRegion region,boolean horizontal){
-		deleteCell(region.getRow(),region.getColumn(),region.getLastRow(),region.getLastColumn(),horizontal);
+		deleteCell(region.getRow(), region.getColumn(), region.getLastRow(), region.getLastColumn(), horizontal);
 	}
 	@Override
 	public void deleteCell(int rowIdx,int columnIdx,int lastRowIdx, int lastColumnIdx,boolean horizontal){
@@ -927,7 +928,7 @@ public class SheetImpl extends AbstractSheetAdv {
 			ModelUpdateUtil.addCellUpdate(this, rowIdx, columnIdx, getBook().getMaxRowIndex(), lastColumnIdx, CellAttribute.ALL); //ZSS-939
 		}
 		
-		shiftAfterCellDelete(rowIdx, columnIdx, lastRowIdx,lastColumnIdx,horizontal);
+		shiftAfterCellDelete(rowIdx, columnIdx, lastRowIdx, lastColumnIdx, horizontal);
 	}
 	
 	
@@ -959,7 +960,7 @@ public class SheetImpl extends AbstractSheetAdv {
 			}
 		}
 		
-		extendFormula(new CellRegion(rowIdx, columnIdx, lastRowIdx, lastColumnIdx),horizontal);
+		extendFormula(new CellRegion(rowIdx, columnIdx, lastRowIdx, lastColumnIdx), horizontal);
 	}
 	
 	private void shiftAfterCellDelete(int rowIdx, int columnIdx, int lastRowIdx,
@@ -992,7 +993,7 @@ public class SheetImpl extends AbstractSheetAdv {
 			}
 		}
 		
-		shrinkFormula(new CellRegion(rowIdx, columnIdx, lastRowIdx, lastColumnIdx),horizontal);
+		shrinkFormula(new CellRegion(rowIdx, columnIdx, lastRowIdx, lastColumnIdx), horizontal);
 	}
 	
 	@Override
@@ -1115,7 +1116,7 @@ public class SheetImpl extends AbstractSheetAdv {
 		}
 
 		int size = lastColumnIdx - columnIdx + 1;
-		insertAndSplitColumnArray(columnIdx,size);
+		insertAndSplitColumnArray(columnIdx, size);
 		
 		for(AbstractRowAdv row:_rows.values()){
 			row.insertCell(columnIdx,size);
@@ -1126,7 +1127,7 @@ public class SheetImpl extends AbstractSheetAdv {
 		
 		Map<String,Object> dataBefore = shiftBeforeColumnInsert(columnIdx,lastColumnIdx);
 		ModelUpdateUtil.addInsertDeleteUpdate(this, true, false, columnIdx, lastColumnIdx);
-		shiftAfterColumnInsert(dataBefore,columnIdx,lastColumnIdx);
+		shiftAfterColumnInsert(dataBefore, columnIdx, lastColumnIdx);
 	}
 	
 	private Map<String, Object> shiftBeforeColumnInsert(int columnIdx,
@@ -1175,7 +1176,7 @@ public class SheetImpl extends AbstractSheetAdv {
 
 		//TODO shift data validation?
 		
-		extendFormula(new CellRegion(0,columnIdx,_book.getMaxRowIndex(),lastColumnIdx), true);
+		extendFormula(new CellRegion(0, columnIdx, _book.getMaxRowIndex(), lastColumnIdx), true);
 		
 		//shift freeze panel
 		int freezeIdx = _viewInfo.getNumOfColumnFreeze()-1;
@@ -1346,7 +1347,7 @@ public class SheetImpl extends AbstractSheetAdv {
 
 		//TODO shift data validation?
 
-		shrinkFormula(new CellRegion(0,columnIdx,_book.getMaxRowIndex(),lastColumnIdx), true);
+		shrinkFormula(new CellRegion(0, columnIdx, _book.getMaxRowIndex(), lastColumnIdx), true);
 		
 		//shift freeze panel
 		int freezeIdx = _viewInfo.getNumOfColumnFreeze()-1;
@@ -1554,7 +1555,7 @@ public class SheetImpl extends AbstractSheetAdv {
 		Set<Ref> dependents = dt.getDirectDependents(ref);
 		if(dependents.size()>0){
 			FormulaTunerHelper tuner = new FormulaTunerHelper(bs);
-			tuner.shrink(new SheetRegion(this,src),dependents,horizontal);
+			tuner.shrink(new SheetRegion(this, src), dependents, horizontal);
 		}
 	}
 	
@@ -1567,7 +1568,7 @@ public class SheetImpl extends AbstractSheetAdv {
 		Set<Ref> dependents = dt.getDirectDependents(ref);
 		if(dependents.size()>0){
 			FormulaTunerHelper tuner = new FormulaTunerHelper(bs);
-			tuner.extend(new SheetRegion(this,src),dependents,horizontal);
+			tuner.extend(new SheetRegion(this, src), dependents, horizontal);
 		}
 	}
 
@@ -1599,7 +1600,7 @@ public class SheetImpl extends AbstractSheetAdv {
 			validation.destroy();
 		}
 		_dataValidations.clear();
-		
+		btree.clear();
 		_book = null;
 		//TODO all 
 		
@@ -1618,6 +1619,17 @@ public class SheetImpl extends AbstractSheetAdv {
 	public void setDBId(int dbId) {
 		_dbid=dbId;
 	}
+
+	@Override
+	public void setBtree() {
+		this.btree = new BTree<Integer, Integer>(block_size, Integer.class, Integer.class, getDBId(), getBook().getId());
+	}
+
+	@Override
+	public BTree<Integer,Integer> getBtree() {
+		return btree;
+	}
+
 
 
 	public SPicture addPicture(Format format, byte[] data,ViewAnchor anchor) {

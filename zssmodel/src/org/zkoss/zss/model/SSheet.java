@@ -16,6 +16,8 @@ Copyright (C) 2013 Potix Corporation. All Rights Reserved.
 */
 package org.zkoss.zss.model;
 
+import org.zkoss.zss.model.impl.BTree;
+
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -108,6 +110,8 @@ public interface SSheet {
 
 	public int getDBId();
 	public void setDBId(int dbId);
+	public void setBtree();
+	public BTree<Integer,Long> getBtree();
 
 	public SSheetViewInfo getViewInfo();
 	public SPrintSetup getPrintSetup();

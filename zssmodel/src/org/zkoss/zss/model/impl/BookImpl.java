@@ -16,44 +16,10 @@ Copyright (C) 2013 Potix Corporation. All Rights Reserved.
 */
 package org.zkoss.zss.model.impl;
 
-import java.sql.*;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Supplier;
-
 import org.zkoss.lang.Objects;
-import org.zkoss.poi.ss.SpreadsheetVersion;
 import org.zkoss.util.logging.Log;
 import org.zkoss.zk.ui.Executions;
-import org.zkoss.zss.model.EventQueueModelEventListener;
-import org.zkoss.zss.model.InvalidModelOpException;
-import org.zkoss.zss.model.ModelEvent;
-import org.zkoss.zss.model.ModelEventListener;
-import org.zkoss.zss.model.ModelEvents;
-import org.zkoss.zss.model.SBookSeries;
-import org.zkoss.zss.model.SCell;
-import org.zkoss.zss.model.SCellStyle;
-import org.zkoss.zss.model.SColor;
-import org.zkoss.zss.model.SColumnArray;
-import org.zkoss.zss.model.SFont;
-import org.zkoss.zss.model.SName;
-import org.zkoss.zss.model.SPicture;
-import org.zkoss.zss.model.SPictureData;
-import org.zkoss.zss.model.SRow;
-import org.zkoss.zss.model.SSheet;
-import org.zkoss.zss.model.SNamedStyle;
-import org.zkoss.zss.model.STable;
-import org.zkoss.zss.model.STableColumn;
+import org.zkoss.zss.model.*;
 import org.zkoss.zss.model.impl.sys.DependencyTableAdv;
 import org.zkoss.zss.model.impl.sys.formula.ParsingBook;
 import org.zkoss.zss.model.sys.EngineFactory;
@@ -66,8 +32,11 @@ import org.zkoss.zss.model.util.CellStyleMatcher;
 import org.zkoss.zss.model.util.FontMatcher;
 import org.zkoss.zss.model.util.Strings;
 import org.zkoss.zss.model.util.Validations;
-import org.zkoss.zss.range.impl.NotifyChangeHelper;
 import org.zkoss.zss.range.impl.StyleUtil;
+
+import java.sql.*;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author dennis
@@ -191,6 +160,8 @@ public class BookImpl extends AbstractBookAdv{
 		{
 			stmt.execute("DROP TABLE " + bookTable + "_sheetdata");
 			stmt.execute("DROP TABLE " + bookTable + "_workbook");
+			stmt.execute("DROP TABLE " + bookTable + "_rowid_index_roots_btree");
+			stmt.execute("DROP TABLE " + bookTable + "_rowid_index_btree");
 			deleteBookStmt.setString(1, bookName);
 			deleteBookStmt.execute();
 			connection.commit();
@@ -232,6 +203,26 @@ public class BookImpl extends AbstractBookAdv{
 					"  maxcolumn     INTEGER," +
 					"  PRIMARY KEY (sheetid))";
 			stmt.execute(createBookRelation);
+
+			//Enable Btree
+			String createRootBtree = "CREATE UNLOGGED TABLE " + bookTable + "_rowid_index_roots_btree (" +
+					"root_oid OID UNIQUE, " +
+					"isordered BOOLEAN, " +
+					"sheetid int) " +
+					"WITHOUT OIDS;";
+			stmt.execute(createRootBtree);
+			String createBtree = "CREATE UNLOGGED TABLE " + bookTable +  "rowid_index_btree (" +
+					"parent OID, " +
+					"key VARCHAR, " +
+					"ischild BOOLEAN, " +
+					"children VARCHAR, " +
+					"recordcount VARCHAR, " +
+					"next_sibling OID, " +
+					"value VARCHAR, " +
+					"PRIMARY KEY (oid)) " +
+					"WITH OIDS;";
+			stmt.execute(createBtree);
+
 
 			String insertBook = "INSERT INTO books(bookname, booktable) VALUES (?,?)";
 			PreparedStatement insertBookStmt = connection.prepareStatement(insertBook);
@@ -334,6 +325,7 @@ public class BookImpl extends AbstractBookAdv{
 		AbstractSheetAdv sheet = new SheetImpl(this,nextObjId("sheet"));
 		sheet.setDBId(dbId);
 		sheet.setSheetName(name, false);
+		sheet.setBtree();
 		_sheets.add(sheet);
 
 		//create formula cache for any sheet, sheet name, position change
@@ -345,7 +337,7 @@ public class BookImpl extends AbstractBookAdv{
 	
 	@Override
 	public SSheet createSheet(String name) {
-		return createSheet(name,null);
+		return createSheet(name, null);
 	}
 	
 	@Override
@@ -395,8 +387,10 @@ public class BookImpl extends AbstractBookAdv{
 				stmt.setInt(3,sheet.getEndRowIndex());
 				stmt.setInt(4,sheet.getEndColumnIndex());
 				ResultSet rs = stmt.executeQuery();
-				if (rs.next())
+				if (rs.next()){
 					sheet.setDBId(rs.getInt("sheetid"));
+					sheet.setBtree();
+				}
 				rs.close();
 				connection.commit();
 			}
@@ -404,10 +398,9 @@ public class BookImpl extends AbstractBookAdv{
 			{
 				e.printStackTrace();
 			}
-		}
-		else
-		{
+		} else {
 			sheet.setDBId(nextIntObjId("dbsheet"));
+			sheet.setBtree();
 		}
 
 		if(src instanceof AbstractSheetAdv){
@@ -580,14 +573,18 @@ public class BookImpl extends AbstractBookAdv{
 			String bookTable=getId();
 			String deleteSheet = "DELETE FROM " + bookTable + "_workbook WHERE sheetid = ?";
 			String deleteSheetData = "DELETE FROM " + bookTable + "_sheetdata WHERE sheetid = ?";
+			String deleteSheetBtree = "DELETE FROM " + bookTable + "_rowid_index_roots_btree WHERE sheetid = ?";
 			try (Connection connection = DBHandler.instance.getConnection();
 				 PreparedStatement deleteSheetstmt = connection.prepareStatement(deleteSheet);
-				 PreparedStatement deleteSheetDatastmt = connection.prepareStatement(deleteSheetData);)
+				 PreparedStatement deleteSheetDatastmt = connection.prepareStatement(deleteSheetData);
+				 PreparedStatement deleteSheetBtreeRootstmt = connection.prepareStatement(deleteSheetBtree);)
 			{
 				deleteSheetstmt.setInt(1,sheet.getDBId());
 				deleteSheetstmt.execute();
 				deleteSheetDatastmt.setInt(1,sheet.getDBId());
 				deleteSheetDatastmt.execute();
+				deleteSheetBtreeRootstmt.setInt(1,sheet.getDBId());
+				deleteSheetBtreeRootstmt.execute();
 				connection.commit();
 			}
 			catch (SQLException e)

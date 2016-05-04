@@ -16,30 +16,11 @@ Copyright (C) 2013 Potix Corporation. All Rights Reserved.
 */
 package org.zkoss.zss.model.impl;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Set;
-
 import org.zkoss.poi.ss.formula.FormulaRenderer;
 import org.zkoss.poi.ss.formula.ptg.Ptg;
-import org.zkoss.zss.model.CellRegion;
-import org.zkoss.zss.model.InvalidModelOpException;
-import org.zkoss.zss.model.PasteOption;
+import org.zkoss.zss.model.*;
 import org.zkoss.zss.model.PasteOption.PasteType;
-import org.zkoss.zss.model.SBook;
-import org.zkoss.zss.model.SCell;
 import org.zkoss.zss.model.SCell.CellType;
-import org.zkoss.zss.model.SCellStyle;
-import org.zkoss.zss.model.SDataValidation;
-import org.zkoss.zss.model.SSheet;
-import org.zkoss.zss.model.SheetRegion;
 import org.zkoss.zss.model.impl.sys.formula.ParsingBook;
 import org.zkoss.zss.model.sys.EngineFactory;
 import org.zkoss.zss.model.sys.formula.FormulaEngine;
@@ -47,6 +28,11 @@ import org.zkoss.zss.model.sys.formula.FormulaExpression;
 import org.zkoss.zss.model.sys.formula.FormulaParseContext;
 import org.zkoss.zss.model.util.Validations;
 import org.zkoss.zss.range.impl.StyleUtil;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.util.*;
 /**
  * 
  * @author Dennis
@@ -528,11 +514,12 @@ public class PasteCellHelper { //ZSS-693: promote visibility
 					break;				
 				}
 
-				insertStmt.setInt(2, destCell.getRowIndex());
+				int rowid = _destSheet.getBtree().getByCount(destCell.getRowIndex());
+				insertStmt.setInt(2, rowid);
 				insertStmt.setInt(3, destCell.getColumnIndex());
 				insertStmt.setString(4, updatedValue);
 				insertStmt.setString(5,updatedValue);
-				insertStmt.setInt(7, destCell.getRowIndex());
+				insertStmt.setInt(7, rowid);
 				insertStmt.setInt(8, destCell.getColumnIndex());
 				insertStmt.execute();
 
