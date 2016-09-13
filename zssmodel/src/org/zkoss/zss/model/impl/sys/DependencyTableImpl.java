@@ -1,20 +1,13 @@
 package org.zkoss.zss.model.impl.sys;
 
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Queue;
-import java.util.Set;
-
 import org.zkoss.util.logging.Log;
 import org.zkoss.zss.model.SBook;
 import org.zkoss.zss.model.SBookSeries;
 import org.zkoss.zss.model.sys.dependency.Ref;
 import org.zkoss.zss.model.sys.dependency.Ref.RefType;
+
+import java.util.*;
+import java.util.Map.Entry;
 
 /* DependencyTableImpl.java
 
@@ -34,15 +27,14 @@ import org.zkoss.zss.model.sys.dependency.Ref.RefType;
  * @since 3.5.0
  */
 public class DependencyTableImpl extends DependencyTableAdv {
-	private static final long serialVersionUID = 1L;
-	private static final Log _logger = Log.lookup(DependencyTableImpl.class.getName());
 	protected static final EnumSet<RefType> _regionTypes = EnumSet.of(RefType.BOOK, RefType.SHEET, RefType.AREA,
 			RefType.CELL, RefType.TABLE);
-
+	private static final long serialVersionUID = 1L;
+	private static final Log _logger = Log.lookup(DependencyTableImpl.class.getName());
 	/** Map<dependant, precedent> */
 	protected Map<Ref, Set<Ref>> _map = new LinkedHashMap<Ref, Set<Ref>>();
 	protected Map<Ref, Set<Ref>> _evaledMap = new LinkedHashMap<Ref, Set<Ref>>();
-	protected SBookSeries _books;
+	protected SBookSeries _books; // Kelly will  update this
 
 	public DependencyTableImpl() {
 	}
@@ -113,6 +105,8 @@ public class DependencyTableImpl extends DependencyTableAdv {
 			Ref p = queue.remove();
 			for(Entry<Ref, Set<Ref>> entry : base.entrySet()) {
 				Ref target = entry.getKey();
+
+
 				if(!result.contains(target)) {
 					//ZSS-581, should also match to precedent (especially for larger scope ref).
 					if((precedentType==RefType.BOOK || precedentType==RefType.SHEET) && isMatched(target, precedent)) {
