@@ -1,9 +1,5 @@
 package org.zkoss.zss.range.impl;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
-
 import org.zkoss.util.logging.Log;
 import org.zkoss.zss.model.SBook;
 import org.zkoss.zss.model.SBookSeries;
@@ -14,6 +10,10 @@ import org.zkoss.zss.model.sys.dependency.ObjectRef;
 import org.zkoss.zss.model.sys.dependency.ObjectRef.ObjectType;
 import org.zkoss.zss.model.sys.dependency.Ref;
 import org.zkoss.zss.model.sys.dependency.Ref.RefType;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
 /**
  * 
  * @author Dennis
@@ -65,7 +65,9 @@ import org.zkoss.zss.model.sys.dependency.Ref.RefType;
 			}
 			//clear the dependent's formula cache since the precedent is changed.
 			if (notify.getType() == RefType.CELL || notify.getType() == RefType.AREA) {
-				handleAreaRef(notify, cellAttr); //ZSS-939
+				if (notify.isRequired()) {
+					handleAreaRef(notify, cellAttr); //ZSS-939
+				}
 			} else if (notify.getType() == RefType.OBJECT) {
 				if(((ObjectRef)notify).getObjectType()==ObjectType.CHART){
 					chartDependents.put(((ObjectRef)notify).getObjectIdPath()[0], notify);

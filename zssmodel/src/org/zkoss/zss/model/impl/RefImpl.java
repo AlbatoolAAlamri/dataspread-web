@@ -16,10 +16,10 @@ Copyright (C) 2013 Potix Corporation. All Rights Reserved.
 */
 package org.zkoss.zss.model.impl;
 
-import java.io.Serializable;
-
 import org.zkoss.zss.model.CellRegion;
 import org.zkoss.zss.model.sys.dependency.Ref;
+
+import java.io.Serializable;
 /**
  * 
  * @author dennis
@@ -28,14 +28,15 @@ import org.zkoss.zss.model.sys.dependency.Ref;
 public class RefImpl implements Ref, Serializable {
 
 	private static final long serialVersionUID = 1L;
-	final private RefType _type;
 	final protected String bookName;
 	final protected String sheetName;
 	final protected String lastSheetName;
+	final private RefType _type;
 	final private int _row;
 	final private int _column;
 	final private int _lastRow;
 	final private int _lastColumn;
+	protected boolean _require;
 	private int _sheetIdx = -1; // tricky! used in IntervalTree only!
 
 	public RefImpl(String bookName, String sheetName, int row, int column,
@@ -71,7 +72,7 @@ public class RefImpl implements Ref, Serializable {
 	}
 
 	public RefImpl(AbstractSheetAdv sheet, int sheetIdx) {
-		this(RefType.SHEET, ((AbstractBookAdv) sheet.getBook()).getBookName(), sheet.getSheetName(), null, -1, -1, -1, -1);
+		this(RefType.SHEET, sheet.getBook().getBookName(), sheet.getSheetName(), null, -1, -1, -1, -1);
 		this._sheetIdx = sheetIdx;
 	}
 
@@ -89,6 +90,7 @@ public class RefImpl implements Ref, Serializable {
 		this._column = column;
 		this._lastRow = lastRow;
 		this._lastColumn = lastColumn;
+		this._require = true;
 	}
 
 	@Override
@@ -129,6 +131,16 @@ public class RefImpl implements Ref, Serializable {
 	@Override
 	public int getLastColumn() {
 		return _lastColumn;
+	}
+
+	@Override
+	public boolean isRequired() {
+		return _require;
+	}
+
+	@Override
+	public void changeRequired(boolean require) {
+		this._require = require;
 	}
 
 	@Override
@@ -180,9 +192,7 @@ public class RefImpl implements Ref, Serializable {
 				return false;
 		} else if (!lastSheetName.equals(other.getLastSheetName()))
 			return false;
-		if (_type != other.getType())
-			return false;
-		return true;
+		return _type == other.getType();
 	}
 
 	@Override
