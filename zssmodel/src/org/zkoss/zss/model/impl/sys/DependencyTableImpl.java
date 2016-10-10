@@ -34,7 +34,8 @@ public class DependencyTableImpl extends DependencyTableAdv {
 	/** Map<dependant, precedent> */
 	protected Map<Ref, Set<Ref>> _map = new LinkedHashMap<Ref, Set<Ref>>();
 	protected Map<Ref, Set<Ref>> _evaledMap = new LinkedHashMap<Ref, Set<Ref>>();
-	protected SBookSeries _books; // Kelly will  update this
+	protected SBookSeries _books;
+
 
 	public DependencyTableImpl() {
 	}
@@ -117,6 +118,7 @@ public class DependencyTableImpl extends DependencyTableAdv {
 					for(Ref pre : entry.getValue()) {
 						if(isMatched(pre, p)) {
 							result.add(target);
+							target.changeRequired(false);
 							queue.add(target);
 							break;
 						}
