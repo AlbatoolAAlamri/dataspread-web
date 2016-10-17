@@ -36,7 +36,6 @@ public class RefImpl implements Ref, Serializable {
 	final private int _column;
 	final private int _lastRow;
 	final private int _lastColumn;
-	protected boolean _require;
 	private int _sheetIdx = -1; // tricky! used in IntervalTree only!
 
 	public RefImpl(String bookName, String sheetName, int row, int column,
@@ -90,7 +89,6 @@ public class RefImpl implements Ref, Serializable {
 		this._column = column;
 		this._lastRow = lastRow;
 		this._lastColumn = lastColumn;
-		this._require = true;
 	}
 
 	@Override
@@ -131,16 +129,6 @@ public class RefImpl implements Ref, Serializable {
 	@Override
 	public int getLastColumn() {
 		return _lastColumn;
-	}
-
-	@Override
-	public boolean isRequired() {
-		return _require;
-	}
-
-	@Override
-	public void changeRequired(boolean require) {
-		this._require = require;
 	}
 
 	@Override

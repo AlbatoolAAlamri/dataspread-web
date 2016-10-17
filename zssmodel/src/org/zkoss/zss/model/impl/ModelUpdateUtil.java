@@ -16,16 +16,13 @@ Copyright (C) 2013 Potix Corporation. All Rights Reserved.
 */
 package org.zkoss.zss.model.impl;
 
-import java.util.Set;
-
-import org.zkoss.zss.model.CellRegion;
-import org.zkoss.zss.model.SBookSeries;
-import org.zkoss.zss.model.SCell;
-import org.zkoss.zss.model.SSheet;
-import org.zkoss.zss.model.STable;
+import org.zkoss.zss.model.*;
+import org.zkoss.zss.model.sys.UpdateTable;
 import org.zkoss.zss.model.sys.dependency.DependencyTable;
 import org.zkoss.zss.model.sys.dependency.Ref;
 import org.zkoss.zss.range.impl.ModelUpdateCollector;
+
+import java.util.Set;
 
 /**
  * 
@@ -52,11 +49,17 @@ import org.zkoss.zss.range.impl.ModelUpdateCollector;
 			addRefUpdate(precedent);
 		}
 		if(dependents!=null && dependents.size()>0){
-			if(clearer!=null){
-				clearer.clear(dependents);
-			}else if(bookSeries.isAutoFormulaCacheClean()){
-				new FormulaCacheClearHelper(bookSeries).clear(dependents);
+//			if(clearer!=null){
+//				clearer.clear(dependents);
+//			}else if(bookSeries.isAutoFormulaCacheClean()){
+//				new FormulaCacheClearHelper(bookSeries).clear(dependents);
+//			}
+
+			UpdateTable ut = ((AbstractBookSeriesAdv) bookSeries).getUpdateTable();
+			for (Ref r : dependents) {
+				ut.add(r);
 			}
+
 			if(collector!=null){
 				collector.addRefs(dependents);
 			}

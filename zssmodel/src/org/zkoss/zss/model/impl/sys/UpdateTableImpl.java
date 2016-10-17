@@ -39,9 +39,9 @@ public class UpdateTableImpl extends UpdateTableAdv {
     @Override
     public void delete(Ref target) {
         if (_dirtySet.contains(target)) {
-            _dirtySet.add(target);
+            _dirtySet.remove(target);
+            System.out.println("Delete from updateTable " + target);
         }
-        System.out.println("Delete from updateTable " + target);
     }
 
     @Override

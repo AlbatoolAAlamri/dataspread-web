@@ -65,9 +65,9 @@ import java.util.Set;
 			}
 			//clear the dependent's formula cache since the precedent is changed.
 			if (notify.getType() == RefType.CELL || notify.getType() == RefType.AREA) {
-				if (notify.isRequired()) {
+				//if (notify.isRequired()) {
 					handleAreaRef(notify, cellAttr); //ZSS-939
-				}
+				//}
 			} else if (notify.getType() == RefType.OBJECT) {
 				if(((ObjectRef)notify).getObjectType()==ObjectType.CHART){
 					chartDependents.put(((ObjectRef)notify).getObjectIdPath()[0], notify);

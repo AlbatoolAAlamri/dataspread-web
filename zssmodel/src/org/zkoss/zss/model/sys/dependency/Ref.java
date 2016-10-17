@@ -30,10 +30,6 @@ public interface Ref {
 	//since 3.7.0
 	int getLastSheetIndex();
 
-	boolean isRequired();
-
-	void changeRequired(boolean require);
-
 	/**
 	 * @since 3.5.0
 	 */

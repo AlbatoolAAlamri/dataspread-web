@@ -118,7 +118,6 @@ public class DependencyTableImpl extends DependencyTableAdv {
 					for(Ref pre : entry.getValue()) {
 						if(isMatched(pre, p)) {
 							result.add(target);
-							target.changeRequired(false);
 							queue.add(target);
 							break;
 						}
