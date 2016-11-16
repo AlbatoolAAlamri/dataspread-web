@@ -92,10 +92,18 @@ public class SheetImpl extends AbstractSheetAdv {
 	private int _defaultRowHeight = 20;//in pixel
 	private int _maxColumnIndex=-1;
 	private int _maxRowIndex=-1;
-	
+
+	private DirtyTable _dirtyTable;
+
 	public SheetImpl(AbstractBookAdv book,String id){
 		this._book = book;
 		this._id = id;
+		this._dirtyTable = new DirtyTable(("Dirty_" + _id));
+	}
+
+	@Override
+	public DirtyTable getDirtyTable() {
+		return _dirtyTable;
 	}
 	
 	protected void checkOwnership(SPicture picture){

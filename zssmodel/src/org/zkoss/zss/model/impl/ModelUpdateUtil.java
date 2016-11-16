@@ -17,7 +17,6 @@ Copyright (C) 2013 Potix Corporation. All Rights Reserved.
 package org.zkoss.zss.model.impl;
 
 import org.zkoss.zss.model.*;
-import org.zkoss.zss.model.sys.UpdateTable;
 import org.zkoss.zss.model.sys.dependency.DependencyTable;
 import org.zkoss.zss.model.sys.dependency.Ref;
 import org.zkoss.zss.range.impl.ModelUpdateCollector;
@@ -55,9 +54,15 @@ import java.util.Set;
 //				new FormulaCacheClearHelper(bookSeries).clear(dependents);
 //			}
 
-			UpdateTable ut = ((AbstractBookSeriesAdv) bookSeries).getUpdateTable();
+//			UpdateTable ut = ((AbstractBookSeriesAdv) bookSeries).getUpdateTable();
+//			for (Ref r : dependents) {
+//				ut.add(r);
+//			}
+
 			for (Ref r : dependents) {
-				ut.add(r);
+				SSheet sheet = bookSeries.getBook(r.getBookName()).getSheetByName(r.getSheetName());
+				DirtyTable dirtyTable = sheet.getDirtyTable();
+				dirtyTable.add(r, sheet);
 			}
 
 			if(collector!=null){
